@@ -36,9 +36,9 @@ $RESULTS_DIR_NAME = "results"
 # extension (ej. conv2d_x87 para conv2d_x87.exe).
 # --------------------------------------------------------------------------
 $VERSION_LABELS = [ordered]@{
-    "conv2d_c"    = "C puro (loop unrolling)"
-    "conv2d_x87"  = "x87 FPU - NASM, bucle completo (ST0..ST7)"
-    "conv2d_simd" = "SSE packed - NASM, bucle completo (XMM0..XMM2)"
+    "conv2d_c"    = "C"
+    "conv2d_x87"  = "x87 FPU"
+    "conv2d_simd" = "SSE packed"
 }
 
 # --------------------------------------------------------------------------
@@ -188,7 +188,6 @@ function Show-DeviceInfo {
     Write-Section "Benchmark note"
     Write-Host "  PE32 binaries (x86, 32-bit), compiled with MSVC + NASM."
     Write-Host "  Flags: /Od /arch:IA32 (no optimization, no auto-vectorization)."
-    Write-Host "  x87 and SSE versions implement the full loop in ASM."
     Write-Host ""
 }
 
@@ -337,7 +336,7 @@ function Show-ComparisonTable {
 
     # ---- Speedup vs primera version (C puro) ----
     Write-Host ""
-    Write-Host "  Speedup vs C pure (timing -- lower is better):" -ForegroundColor Yellow
+    Write-Host "  Speedup vs pure C (lower is better):" -ForegroundColor Yellow
     Write-Host ("  " + "-" * 58) -ForegroundColor DarkGray
     Write-Host ("  {0,-26} {1,12} {2,10}" -f "Version", "Diff(ms)", "Speedup") -ForegroundColor White
     Write-Host ("  " + "-" * 58) -ForegroundColor DarkGray
@@ -356,7 +355,7 @@ function Show-ComparisonTable {
 
     # ---- Throughput vs primera version ----
     Write-Host ""
-    Write-Host "  Throughput vs C pure (higher is better):" -ForegroundColor Yellow
+    Write-Host "  Throughput vs pure C (higher is better):" -ForegroundColor Yellow
     Write-Host ("  " + "-" * 58) -ForegroundColor DarkGray
     Write-Host ("  {0,-26} {1,14} {2,10}" -f "Version", "Diff(MB/s)", "Ratio") -ForegroundColor White
     Write-Host ("  " + "-" * 58) -ForegroundColor DarkGray

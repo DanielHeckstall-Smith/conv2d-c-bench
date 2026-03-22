@@ -125,15 +125,23 @@ int main(int argc, char* argv[])
      * Ejemplo: "bin/conv2d_SSE.exe" -> "conv2d_SSE"
      */
     const char* exe_path = argv[0];
-    const char* slash = exe_path;
-    /* avanzar hasta el ultimo separador de ruta */
-    for (const char* p = exe_path; *p; p++)
-        if (*p == '/' || *p == '\\') slash = p + 1;
+    int start_idx = 0;
+   
+    for (int i = 0; exe_path[i] != '\0'; i++) {
+        if (exe_path[i] == '/' || exe_path[i] == '\\') {
+            start_idx = i + 1; 
+        }
+    }
 
     char exe_name[64];
-    int  n = 0;
-    for (const char* p = slash; *p && *p != '.' && n < 63; p++)
-        exe_name[n++] = *p;
+    int n = 0;
+
+    for (int i = start_idx; exe_path[i] != '\0' && exe_path[i] != '.'; i++) {
+        if (n < 63) {
+            exe_name[n] = exe_path[i];
+            n++;
+        }
+    }
     exe_name[n] = '\0';
     /* ------------------------------------------------------------------ */
 
