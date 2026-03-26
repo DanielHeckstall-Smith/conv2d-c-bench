@@ -30,13 +30,17 @@
 ;   [ebp + 20] = height  (int)
 ;   [ebp + 24] = kernel  (puntero a float[3][3])
 ;
-; VARIABLES LOCALES (sub esp, 20 reserva 5 enteros):
+; VARIABLES LOCALES (sub esp, 16 reserva 4 enteros — identico a conv2d_x87.asm):
 ; ------------------------------------------
-;   [ebp -  4] = row_stride    width * 4  (bytes por fila)
-;   [ebp -  8] = j_limit       height - 1 (limite bucle j)
-;   [ebp - 12] = i_limit       width  - 1 (limite bucle i escalar: i < i_limit)
-;   [ebp - 16] = i_sse_limit   width  - 4 (limite bucle SSE:       i < i_sse_limit)
-;   [ebp - 20] = j             indice del bucle exterior
+;   [ebp -  4] = row_stride  width * 4  (bytes por fila)
+;   [ebp -  8] = j_limit     height - 1 (limite bucle j)
+;   [ebp - 12] = i_limit     width  - 1 (limite bucle i escalar: i < i_limit)
+;   [ebp - 16] = j           indice del bucle exterior
+;
+; NOTA: i_sse_limit (width-4) no necesita variable propia porque las dimensiones
+; son constantes de compilacion (WIDTH=3072, KERNEL_SIZE=3). Se deriva inline
+; en la condicion del bucle SSE: i_limit - 3 == width - 4. Si quisieramos hacer 
+; una version adaptable a distintas dimensiones de matriz de entrada, seria primordial.
 ;
 ;
 ; ASIGNACION DE REGISTROS (bucles interior)
@@ -103,7 +107,7 @@ _conv2d_impl:
     ; ---- Prologo cdecl ----
     push    ebp
     mov     ebp, esp
-    sub     esp, 20             ; reservar 5 variables locales
+    sub     esp, 16             ; reservar 4 variables locales (identico a x87)
     push    ebx                 ; no-volatil
     push    esi                 ; no-volatil
     push    edi                 ; no-volatil
@@ -125,17 +129,12 @@ _conv2d_impl:
     dec     eax
     mov     [ebp - 12], eax     ; local: i_limit
 
-    ; i_sse_limit = width - 4  (bucle SSE: i < i_sse_limit, garantiza i+3 <= width-2)
-    mov     eax, [ebp + 16]     ; eax = width
-    sub     eax, 4
-    mov     [ebp - 16], eax     ; local: i_sse_limit
-
     ; j = 1
-    mov     dword [ebp - 20], 1
+    mov     dword [ebp - 16], 1
 
 ; ---- Bucle exterior: for (j = 1; j < height-1; j++) ----
 .outer:
-    mov     eax, [ebp - 20]     ; eax = j
+    mov     eax, [ebp - 16]     ; eax = j
     cmp     eax, [ebp - 8]      ; j < j_limit ?
     jge     .done
 
@@ -143,27 +142,27 @@ _conv2d_impl:
     mov     ecx, [ebp - 4]      ; ecx = row_stride
 
     ; EBX = in + (j-1) * row_stride
-    mov     eax, [ebp - 20]
+    mov     eax, [ebp - 16]
     dec     eax                 ; j - 1
     imul    eax, ecx            ; (j-1) * stride
     add     eax, [ebp + 8]      ; + in
     mov     ebx, eax            ; EBX = row0, columna 0
 
     ; ESI = in + j * row_stride
-    mov     eax, [ebp - 20]
+    mov     eax, [ebp - 16]
     imul    eax, ecx            ; j * stride
     add     eax, [ebp + 8]      ; + in
     mov     esi, eax            ; ESI = row1, columna 0
 
     ; EDI = in + (j+1) * row_stride
-    mov     eax, [ebp - 20]
+    mov     eax, [ebp - 16]
     inc     eax                 ; j + 1
     imul    eax, ecx            ; (j+1) * stride
     add     eax, [ebp + 8]      ; + in
     mov     edi, eax            ; EDI = row2, columna 0
 
     ; EDX = out + j * row_stride + 4  (columna i=1)
-    mov     eax, [ebp - 20]
+    mov     eax, [ebp - 16]
     imul    eax, ecx            ; j * stride
     add     eax, [ebp + 12]     ; + out
     add     eax, 4              ; columna 1 (saltar borde izquierdo)
@@ -178,7 +177,9 @@ _conv2d_impl:
 ; ---- Bucle SSE packed: procesa 4 pixeles a la vez ----
 ; EBX/ESI/EDI apuntan a columna i-1; EAX = kernel; ECX = i; EDX = salida columna i.
 .sse_inner:
-    cmp     ecx, [ebp - 16]     ; i < i_sse_limit ?
+    mov     eax, [ebp - 12]     ; i_limit = width-1
+    sub     eax, 3              ; width-4 = i_sse_limit (derivado, no variable propia)
+    cmp     ecx, eax            ; i < i_sse_limit ?
     jge     .scalar_inner
 
     xorps   xmm7, xmm7          ; acumulador = {0, 0, 0, 0}
@@ -323,7 +324,7 @@ _conv2d_impl:
     jmp     .scalar_inner
 
 .next_row:
-    inc     dword [ebp - 20]    ; j++
+    inc     dword [ebp - 16]    ; j++
     jmp     .outer
 
 .done:
@@ -331,6 +332,6 @@ _conv2d_impl:
     pop     edi
     pop     esi
     pop     ebx
-    add     esp, 20             ; liberar variables locales
+    add     esp, 16             ; liberar variables locales (identico a x87)
     pop     ebp
     ret                         ; el llamador (cdecl) limpia los 5 parametros
